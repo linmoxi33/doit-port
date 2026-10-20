@@ -20,7 +20,7 @@ What the receipt layer buys you here:
 
 Run it::
 
-    pip install -e ../..             # doit + doit-port
+    pip install -e "../..[toml310]"  # doit + doit-port (+ tomli on Py 3.10)
     doit                             # first pass: everything executes
     doit                             # second pass: everything is "--"
     doit port status                 # what is cached, and is it intact

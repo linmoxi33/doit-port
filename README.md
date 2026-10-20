@@ -62,10 +62,19 @@ Requires Python ≥ 3.10 and `doit` ≥ 0.36. No third-party runtime dependencie
 
 ## Install
 
+Not on PyPI yet, so install from the published wheel or a checkout:
+
 ```bash
-pip install doit-port          # from a wheel, see dist/
-pip install -e .               # from a source checkout
+# straight from the release asset (this is what CI smoke-tests)
+pip install https://github.com/linmoxi33/doit-port/releases/download/v0.1.1/doit_port-0.1.1-py3-none-any.whl
+
+# or from a source checkout
+git clone https://github.com/linmoxi33/doit-port && cd doit-port
+pip install -e ".[toml310]"    # toml310 only matters on Python 3.10
 ```
+
+Verified: `pip install doit-port` returns 404 on PyPI — the name is unregistered.
+When it is published, this section will say so.
 
 ## Use it
 

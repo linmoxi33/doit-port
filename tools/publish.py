@@ -24,6 +24,7 @@ import json
 import subprocess
 import sys
 import tempfile
+import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -33,6 +34,9 @@ INCLUDE_FILES = ("README.md", "LICENSE", "CHANGELOG.md", "pyproject.toml", ".git
 SKIP_DIR_NAMES = {"__pycache__", ".doit-port", "build", "audit", "dist", ".pytest_cache", ".git", ".venv"}
 SKIP_NAMES = {".doit.db", ".DS_Store", "Thumbs.db"}
 SKIP_SUFFIXES = {".pyc", ".pyo", ".db", ".zip", ".whl"}
+
+#: How many times one API call is attempted before the run is aborted.
+_RETRIES = 4
 
 TEXT_SUFFIXES = {".py", ".md", ".toml", ".cfg", ".txt", ".rst", ".json", ".yml", ".yaml", ".ini", ".gitattributes", ".gitignore", ".sh"}
 BINARY_SUFFIXES = {".png", ".jpg", ".gif", ".ico"}
@@ -82,13 +86,26 @@ def gh(args: list[str], *, input_json: object | None = None) -> object:
         handle.close()
         tmp_path = handle.name
         cmd += ["--input", tmp_path]
-    try:
+    # A transient 404 was seen mid-run once (around blob 32 of 50) and aborted
+    # the whole push, leaving a half-built tree. Retry with a growing pause;
+    # anything still failing after that is a real error.
+    result = None
+    for attempt in range(1, _RETRIES + 1):
         result = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", input=stdin)
-    finally:
-        if tmp_path:
-            Path(tmp_path).unlink(missing_ok=True)
+        if result.returncode == 0:
+            break
+        retriable = any(tag in result.stderr for tag in ("Not Found", "Bad Gateway", "timeout", "502", "503"))
+        if attempt == _RETRIES or not retriable:
+            break
+        time.sleep(1.5 * attempt)
+    if tmp_path:
+        Path(tmp_path).unlink(missing_ok=True)
+    assert result is not None
     if result.returncode != 0:
-        raise SystemExit(f"gh api failed ({result.returncode}): {' '.join(args)}\n{result.stderr.strip()}")
+        raise SystemExit(
+            f"gh api failed ({result.returncode}) after {_RETRIES} attempt(s): "
+            f"{' '.join(args)}\n{result.stderr.strip()}"
+        )
     out = result.stdout.strip()
     if not out:
         return {}
