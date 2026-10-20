@@ -70,6 +70,10 @@ First release. Scope: portable build receipts for `doit`, and nothing else.
 - `tools/mutation_check.py`: 21 injected defects, all caught.
 - `tools/build_archive.py`: reproducible source ZIP (fixed mtimes, LF
   normalisation, generated state excluded).
+- `tools/build_release.py`: the same treatment for the wheel and sdist, which
+  `python -m build` does not give you. Fixes per-member mtimes, rebuilds each
+  `TarInfo`, and zeroes the gzip header time; `--check` proves it by building
+  twice.
 
 ### Known limits
 

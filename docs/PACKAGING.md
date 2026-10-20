@@ -45,16 +45,28 @@ The suite imports `doit_port`; with `pip install -e .` an editable path is on
 `sys.path`, which can mask a missing package-data file. Run at least the
 end-to-end tests once against the installed wheel.
 
-## 5. Determinism of the artefact
+## 5. Determinism of the artefacts
 
 ```bash
-python tools/build_archive.py           # writes dist/doit-port-0.1.0.zip
-python tools/build_archive.py --check   # same input => same sha256
+python tools/build_release.py           # wheel + sdist + source zip into dist/
+python tools/build_release.py --check   # build twice, compare every hash
 ```
 
-Every text file is written with `\n` and a fixed mtime, so the ZIP hash is
-reproducible on this machine. Cross-platform byte-identity is not promised
-(zlib differs between CPython builds) and is not asserted.
+`python -m build` alone is **not** reproducible: setuptools stamps every archive
+member with the source file's mtime, and `tarfile.open(..., "w:gz")` writes the
+current time into the gzip header. Three separate sources of variation had to be
+removed before two builds of the same tree produced the same bytes:
+
+1. **per-member mtime** → fixed to 1980-01-01, and every `TarInfo` rebuilt from
+   scratch. Mutating the one read out of the source archive is not enough,
+   because `addfile()` can overwrite `mtime` for directories.
+2. **gzip header timestamp** → `GzipFile(..., mtime=0, filename="")`. This was
+   the last four bytes of difference.
+3. **entry order** → sorted by name.
+
+`--check` builds everything twice and fails if any hash differs, so the claim is
+tested rather than stated. Cross-platform byte-identity is **not** claimed (zlib
+output can differ between CPython builds) and is not asserted.
 
 ## 6. Line endings
 

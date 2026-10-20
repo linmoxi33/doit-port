@@ -55,16 +55,15 @@ jobs:
           python-version: "3.12"
       - run: python -m pip install -e ".[test,toml310]" build
 
-      # Building the archive twice must produce identical bytes; the tool fails
-      # the job otherwise. Catches stray timestamps, ordering and CRLF leakage.
-      - name: Build archive twice and compare
-        run: python tools/build_archive.py --check
+      # Builds wheel + sdist + source zip twice and fails if any hash differs.
+      # Catches stray timestamps (including the gzip header), ordering, CRLF.
+      - name: Build every artefact twice and compare
+        run: python tools/build_release.py --check
 
       # Installs the wheel into a throwaway environment and runs the example
       # from there: proves the packaged artefact works, not just the source tree.
       - name: Wheel smoke test
         run: |
-          python -m build --wheel
           python -m venv /tmp/wv
           /tmp/wv/bin/pip install --quiet dist/*.whl
           cd examples/codeaudit
