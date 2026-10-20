@@ -17,7 +17,7 @@ doit-port.toml       store location, flavour, drift policy
 ## Run it
 
 ```bash
-pip install -e ../..        # doit + doit-port
+pip install -e "../..[toml310]"   # doit + doit-port (+ tomli on Python 3.10)
 doit all                    # everything executes the first time
 doit all                    # every task is up to date ("--")
 doit port status            # what is cached, sizes, integrity

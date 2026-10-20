@@ -83,12 +83,19 @@ class PortConfig:
         produced on Windows has to be replayable on Linux and vice versa.
         """
         p = Path(value)
+        # ``Path("build\out.txt").as_posix()`` keeps the backslash on POSIX,
+        # where it is a legal filename character rather than a separator. That
+        # produced receipts keyed on "build\out.txt" on Linux and
+        # "build/out.txt" on Windows -- the same project, two different keys.
+        # Normalising explicitly is the only way to get one key everywhere.
+        raw = str(value).replace("\\", "/")
+        p = Path(raw)
         try:
             rel = p.resolve().relative_to(self.root.resolve())
         except ValueError:
             # Outside the project: keep it as given so callers can detect the
             # escape via a leading ``..`` instead of silently absolutising it.
-            return p.as_posix()
+            return raw
         return rel.as_posix()
 
 

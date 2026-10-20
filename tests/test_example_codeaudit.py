@@ -20,6 +20,8 @@ from pathlib import Path
 
 import pytest
 
+from support import drop_doit_state
+
 EXAMPLE = Path(__file__).resolve().parent.parent / "examples" / "codeaudit"
 
 # Deliberately *not* skipped when the example is missing: a shipped source
@@ -41,7 +43,7 @@ def proj(tmp_path: Path) -> Path:
         EXAMPLE,
         target,
         ignore=shutil.ignore_patterns(
-            "audit", "build", ".doit-port", ".doit.db", "__pycache__", "*.pyc"
+            "audit", "build", ".doit-port", ".doit.db*", "__pycache__", "*.pyc"
         ),
     )
     return target
@@ -155,24 +157,39 @@ def test_new_finding_moves_the_gate(proj: Path) -> None:
     assert ran(result) == ["lint:src/sample_pkg/calc.py", "summary", "gate"]
 
 
-def test_reverting_a_module_reruns_only_what_is_stale(proj: Path) -> None:
-    """A revert replays the old state without cascading.
+def test_reverting_a_module_converges_without_rebuilding_everything(proj: Path) -> None:
+    """A revert ends up correct, and does not redo unrelated work.
 
-    The artefact on disk belongs to the newer build, so nothing is replayed for
-    it: the lint step re-runs (cheap), produces byte-identical output, and the
-    cascade stops there -- ``summary`` and ``gate`` keep their receipts.
+    Two things may happen to the reverted module and both are acceptable:
+
+    * doit's own ``.doit.db`` no longer matches the file, so the task runs and
+      produces byte-identical output (early cutoff stops the cascade);
+    * or doit considers it up to date and doit-port replays the earlier receipt.
+
+    Which one occurs depends on doit's DBM bookkeeping, not on this project --
+    asserting an exact list made this test fail on Linux CI while passing on
+    Windows. What must hold everywhere: the modules that were *not* touched
+    never re-run, the gate stays cached, and the report matches the reverted
+    source.
     """
     assert doit(proj, "all").returncode == 0
     calc = proj / "src" / "sample_pkg" / "calc.py"
     original = calc.read_text(encoding="utf-8")
     calc.write_text(original + "\n\n# temporary\n", encoding="utf-8")
-    doit(proj, "all")
+    assert doit(proj, "all").returncode == 0
 
     calc.write_text(original, encoding="utf-8")
     result = doit(proj, "all")
     assert result.returncode == 0
-    assert ran(result) == ["lint:src/sample_pkg/calc.py"]
-    assert "summary" in skipped(result) and "gate" in skipped(result)
+
+    executed = ran(result)
+    assert "lint:src/sample_pkg/__init__.py" not in executed
+    assert "lint:src/sample_pkg/legacy.py" not in executed
+    assert "gate" in skipped(result), "the gate must not re-run for an unchanged report"
+    assert set(executed) <= {"lint:src/sample_pkg/calc.py", "summary"}
+
+    report = (proj / "build" / "audit.json").read_text(encoding="utf-8")
+    assert json.loads(report)["totals"]["findings"] == 6
 
 
 # ---------------------------------------------------------- fresh checkout
@@ -185,7 +202,7 @@ def test_fresh_checkout_restores_instead_of_rebuilding(proj: Path) -> None:
 
     shutil.rmtree(proj / "build")
     shutil.rmtree(proj / "audit")
-    (proj / ".doit.db").unlink()
+    drop_doit_state(proj)
 
     result = doit(proj, "all")
     assert result.returncode == 0
@@ -202,7 +219,7 @@ def test_bundle_moves_the_cache_to_another_directory(proj: Path, tmp_path: Path)
     shutil.copytree(
         proj,
         other,
-        ignore=shutil.ignore_patterns("audit", "build", ".doit.db", ".doit-port"),
+        ignore=shutil.ignore_patterns("audit", "build", ".doit.db*", ".doit-port"),
     )
     # the lint step would notice a missing python module quickly; make sure the
     # restore path is the one exercised by deleting the sources' artefacts only
@@ -293,6 +310,6 @@ def test_port_forget_forces_a_rebuild(proj: Path) -> None:
     assert doit(proj, "all").returncode == 0
     assert doit(proj, "port", "forget", "gate").returncode == 0
     shutil.rmtree(proj / "build")
-    (proj / ".doit.db").unlink()
+    drop_doit_state(proj)
     result = doit(proj, "all")
     assert "gate" in ran(result), "forgetting a receipt must make the task run again"

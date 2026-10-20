@@ -13,6 +13,7 @@ from pathlib import Path
 
 from conftest import clear_runs, load_dodo, read_runs, run_doit
 from doit_port.store import ObjectStore
+from support import drop_doit_state
 
 BUILD = "build"
 
@@ -76,7 +77,7 @@ def test_survives_lost_doit_db_and_wiped_build_dir(project: Path) -> None:
     }
     clear_runs(project)
     shutil.rmtree(project / BUILD)
-    (project / ".doit.db").unlink()
+    drop_doit_state(project)
 
     assert run_doit(project) == 0
     assert read_runs(project) == [], "no action should run when receipts are valid"
@@ -94,7 +95,7 @@ def test_bundle_carries_the_cache_to_another_directory(project: Path, tmp_path: 
     other = tmp_path / "other-machine"
     shutil.copytree(
         project, other,
-        ignore=shutil.ignore_patterns(BUILD, ".doit.db", ".doit-port", "runs.log"),
+        ignore=shutil.ignore_patterns(BUILD, ".doit.db*", ".doit-port", "runs.log"),
     )
     clear_runs(other)
     assert run_doit(other, "port", "import", str(bundle)) == 0
@@ -288,7 +289,7 @@ def test_corrupt_blob_blocks_the_hit_and_rebuilds(project: Path) -> None:
     blob = project / ".doit-port" / "objects" / key[:2] / key
     blob.write_bytes(b"corrupted")
     shutil.rmtree(project / BUILD)
-    (project / ".doit.db").unlink()
+    drop_doit_state(project)
     clear_runs(project)
 
     assert run_doit(project) == 0

@@ -4,6 +4,31 @@ All notable changes to this project. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow
 [SemVer](https://semver.org/).
 
+## [0.1.1] — 2026-10-20
+
+Fixes found by the CI matrix on the first published run — none of them were
+visible on the single Windows machine used during development.
+
+### Fixed
+
+- **Backslashes were not normalised to posix on POSIX systems.**
+  `Path("build\out.txt").as_posix()` keeps the backslash where it is a legal
+  filename character, so the same project produced the keys `build\out.txt` on
+  Linux and `build/out.txt` on Windows: a cache could never cross platforms.
+  `config.relpath()` now replaces `\` with `/` explicitly. Regression test added.
+- **The example required Python ≥ 3.11** because `dodo.py` imported `tomllib`
+  directly. It now falls back to `tomli` with an actionable error message, and
+  the `toml310` extra is documented and used by CI.
+- **Four tests assumed `.doit.db` exists.** Which DBM files doit writes depends
+  on the interpreter's dbm backend, and a run may write none. They now call
+  `tests/support.py::drop_doit_state()`, which globs `.doit.db*`.
+
+### Changed
+
+- The revert test no longer pins an exact task list. Whether doit treats a
+  reverted file as stale is doit's bookkeeping, not this layer's behaviour; the
+  test now asserts the invariants that must hold on every platform.
+
 ## [0.1.0] — 2026-10-20
 
 First release. Scope: portable build receipts for `doit`, and nothing else.

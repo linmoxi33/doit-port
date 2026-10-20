@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "doit-port"
-version = "0.1.0"
+version = "0.1.1"
 description = "Portable, content-addressed build receipts for doit: carry your incremental build cache across machines and CI runs"
 readme = "README.md"
 license = { text = "MIT" }

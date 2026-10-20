@@ -29,7 +29,8 @@ jobs:
       - name: Install
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -e ".[test]"
+          # `toml310` brings tomli on 3.10 only; the example reads audit.toml.
+          python -m pip install -e ".[test,toml310]"
 
       # The suite spawns `python -m doit` as a subprocess, so the CLI has to be
       # importable from a clean interpreter, not only from pytest's sys.path.
@@ -47,7 +48,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: python -m pip install -e ".[test]" build
+      - run: python -m pip install -e ".[test,toml310]" build
 
       # Building the archive twice must produce identical bytes; the tool fails
       # the job otherwise. Catches stray timestamps, ordering and CRLF leakage.
@@ -76,7 +77,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: python -m pip install -e ".[test]"
+      - run: python -m pip install -e ".[test,toml310]"
 
       # This is the job that actually guards correctness: it proves the suite
       # notices twenty-one plausible defects. It is slow on purpose.

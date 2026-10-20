@@ -28,7 +28,7 @@ Probes run **before** writing any code, then promoted into tests:
 
 ```bash
 $ python -m pytest tests/ -q
-214 passed, 1 skipped in 50.84s
+215 passed, 1 skipped in 49.48s
 ```
 
 (The skip is the symlink-escape test: creating a symlink needs a privilege that
@@ -44,7 +44,7 @@ developer mode enabled.)
 | `test_store.py` | 21 | atomicity, integrity, gc, concurrency, crash leftovers |
 | `test_receipt.py` | 20 | schema, tamper detection, history |
 | `test_bundle.py` | 37 | export / verify / import, tampered and hostile bundles |
-| `test_config.py` | 16 | precedence `pyproject` < `doit-port.toml` < `DOIT_CONFIG` |
+| `test_config.py` | 17 | precedence `pyproject` < `doit-port.toml` < `DOIT_CONFIG` |
 | `test_command.py` | 28 | `doit port` argument surface and dispatch |
 | `test_api.py` | 25 | refusals that protect portability, sub-task groups |
 
@@ -143,15 +143,35 @@ gate: FAILED -- 6 findings exceed the budget of 2      (exit != 0)
 $ ls build/gate.txt           # absent -- no target, therefore no receipt
 ```
 
+## 4b. What CI found that Windows alone could not (2026-10-20)
+
+The first CI run after publication failed 8 of 10 jobs. Every failure was a real
+defect that the local Windows-only run could not see:
+
+| Job | Failure | Root cause | Fix |
+|---|---|---|---|
+| ubuntu 3.10 / 3.11 / 3.12 / 3.13 | `assert ['build\out.txt'] == ['build/out.txt']` | `Path("build\out.txt").as_posix()` keeps the backslash on POSIX, where it is a legal filename character. One project, two receipt keys, so a cache never crossed platforms. | `relpath()` normalises `\` → `/` explicitly (not via `as_posix`). Regression test added. |
+| windows 3.10 | `ModuleNotFoundError: tomllib` | the example's `dodo.py` imported `tomllib`, which only exists from 3.11 | guarded `try/except` with a `tomli` fallback and a clear error message |
+| windows 3.10 / 3.11 / 3.12 | `FileNotFoundError: .doit.db` in 4 tests | which DBM files doit writes depends on the interpreter's dbm backend, and a run may write none at all | `tests/support.py::drop_doit_state()` removes whatever `.doit.db*` exists |
+| ubuntu 3.1x | revert test asserted an exact task list | whether doit considers a reverted file stale is doit's DBM bookkeeping, not this project's behaviour | assertion relaxed to the invariants that must hold: untouched modules never re-run, the gate stays cached, the report matches the reverted source |
+| mutation job | same as above | it runs the suite, so it inherited the same failure | fixed by the above |
+
+The revert case is the instructive one: the *claim* ("a revert does not cause a
+full rebuild") was right, but the *assertion* was over-specified. A test that
+pins an exact command list is measuring doit's scheduler, not the receipt layer.
+
 ## 5. Known unverified areas
 
 Stated so that nobody has to guess which claims are backed by evidence:
 
 * **`doit --parallel` / multiprocessing** — not exercised by any test.
-* **Python 3.10** — the code guards for it (`tomli` fallback) and CI-style
-  checks are written, but only 3.13.14 was actually run here.
+* **Python 3.10 / 3.11 / 3.12** — covered by the CI matrix
+  (`.github/workflows/ci.yml`, 2 OS × 4 versions). At the time of writing the
+  fixes from section 4b were pushed after the first failing run; see the CI tab
+  for the current state rather than trusting this line.
 * **Large artefacts** — the streaming path is tested with a 1 MiB blob, not with
   multi-GB files, and `max_blob_mb` default of 256 was not stress-tested.
-* **Cross-OS bundle exchange** — paths are posix-relative and tested for that,
-  but a bundle produced on Windows was not imported on Linux during this
-  session.
+* **Cross-OS bundle exchange** — paths are posix-relative, backslash
+  normalisation is now tested, and a bundle exported on Windows was imported in
+  a second Windows directory. Exporting on one OS and importing on the other was
+  not run end to end.

@@ -33,7 +33,16 @@ import os
 import shutil
 import subprocess
 import sys
-import tomllib
+
+try:  # Python >= 3.11
+    import tomllib
+except ModuleNotFoundError:  # pragma: no cover - exercised on 3.10 in CI
+    try:
+        import tomli as tomllib  # type: ignore[no-redef]
+    except ModuleNotFoundError as exc:  # pragma: no cover
+        raise SystemExit(
+            "audit.toml needs a TOML reader: pip install tomli  (built in from Python 3.11)"
+        ) from exc
 
 from doit_port import port_group, port_task
 
