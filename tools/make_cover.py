@@ -41,7 +41,7 @@ REAL_RUN = [
 ]
 
 FACTS = [
-    ("214", "tests passing"),
+    ("226", "tests passing"),
     ("21", "mutants, all killed"),
     ("0", "runtime deps"),
     ("MIT", "licence"),
