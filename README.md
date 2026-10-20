@@ -213,7 +213,7 @@ compliment a framework can get.
 ## Verification
 
 ```
-$ pytest -q                    # 215 tests, 1 skipped (symlink privilege)
+$ pytest -q                    # 226 tests, 1 skipped (symlink privilege)
 $ python tools/mutation_check.py
 baseline: green
 [ 1/21] targets-not-restored               killed

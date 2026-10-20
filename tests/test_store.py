@@ -181,3 +181,85 @@ def test_large_blob_is_streamed(store: ObjectStore) -> None:
     assert obj is not None
     assert obj.size == len(payload)
     assert store.get_bytes(obj.sha256) == payload
+
+
+# ------------------------------------------------------------ index file names
+#
+# Task names are arbitrary user strings and become file names. The old
+# implementation just replaced "/" and "\\", which left ":" in place -- legal on
+# Linux, illegal on Windows, so the bug only appeared on one platform. Asserting
+# "a file was created" is not enough: on Linux that passes even with the colon.
+# These tests assert the *name* contains only portable characters, which is
+# checkable everywhere.
+
+
+@pytest.mark.parametrize(
+    "task_name",
+    [
+        "lint:src/sample_pkg/calc.py",
+        "summary",
+        "build/a:b",
+        "CON",
+        "with space",
+        "a" * 300,
+        "dots...",
+        "..",
+        "tab	name",
+    ],
+)
+def test_index_file_name_is_portable(store: ObjectStore, task_name: str) -> None:
+    """Index names must be valid on Windows *and* POSIX, and stay short."""
+    path = store.index_path(task_name)
+    name = path.name
+
+    for bad in (":", "*", "?", '"', "<", ">", "|", "\\"):
+        assert bad not in name, f"{bad!r} is illegal in a Windows file name: {name}"
+    assert len(name) <= 80, "index names must not approach MAX_PATH limits"
+    stem = name.split(".")[0]
+    assert stem.strip() != "", "the readable part must not be empty"
+    assert stem[-1] not in "._-", "trailing dots/spaces are illegal on Windows"
+
+    # distinct tasks must never collide, even after truncation
+    other = store.index_path(task_name + "x")
+    assert other.name != name
+
+
+def test_index_names_are_unique_after_encoding(store: ObjectStore) -> None:
+    a = store.index_path("lint:src/a.py")
+    b = store.index_path("lint/src/a.py")
+    c = store.index_path("lint__src__a.py")
+    assert len({a.name, b.name, c.name}) == 3, (
+        "encoding may collapse separators, but the digest suffix must keep them apart"
+    )
+
+
+def test_many_threads_writing_distinct_blobs(store: ObjectStore) -> None:
+    """Concurrency must not surface as exceptions, including on Windows.
+
+    An earlier version retried ``os.replace`` on ``OSError``; a losing thread
+    could still observe a transient error (pytest reported it as an unhandled
+    thread exception), so the race is now serialised per key instead of being
+    caught after the fact. This test runs far more writers than the
+    same-content test, with distinct content, which is the harder case.
+    """
+    import threading
+
+    errors: list[BaseException] = []
+
+    def worker(index: int) -> None:
+        try:
+            for _ in range(20):
+                obj = store.put_bytes(f"payload-{index}".encode() * 50)
+                assert obj is not None
+                assert store.get_bytes(obj.sha256) == f"payload-{index}".encode() * 50
+        except BaseException as exc:  # noqa: BLE001 - the test wants to see anything
+            errors.append(exc)
+
+    threads = [threading.Thread(target=worker, args=(i,)) for i in range(16)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+    assert errors == [], f"concurrent writers raised: {errors[:3]}"
+    assert len(list(store.iter_objects())) == 16
+    assert list(store.tmp_dir.iterdir()) == []

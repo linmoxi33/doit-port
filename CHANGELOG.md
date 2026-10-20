@@ -23,6 +23,12 @@ visible on the single Windows machine used during development.
   on the interpreter's dbm backend, and a run may write none. They now call
   `tests/support.py::drop_doit_state()`, which globs `.doit.db*`.
 
+- **Concurrent blob writes could surface as an unhandled thread exception.**
+  The old code retried `os.replace` on `OSError`; a losing thread could still
+  see a transient error, which pytest reported as a warning rather than a
+  failure. Writers are now serialised per content key, and an unhandled
+  thread exception is configured to fail the suite.
+
 ### Changed
 
 - The revert test no longer pins an exact task list. Whether doit treats a

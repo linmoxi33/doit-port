@@ -51,4 +51,9 @@ where = ["src"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
-filterwarnings = ["error::DeprecationWarning:doit_port.*"]
+# An unhandled exception in a worker thread used to be a warning that pytest
+# printed and moved on from. It is a failure: make it one.
+filterwarnings = [
+    "error::DeprecationWarning:doit_port.*",
+    "error::pytest.PytestUnhandledThreadExceptionWarning",
+]

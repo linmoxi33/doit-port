@@ -28,7 +28,7 @@ Probes run **before** writing any code, then promoted into tests:
 
 ```bash
 $ python -m pytest tests/ -q
-215 passed, 1 skipped in 49.48s
+226 passed, 1 skipped in 52.49s
 ```
 
 (The skip is the symlink-escape test: creating a symlink needs a privilege that
@@ -41,7 +41,7 @@ developer mode enabled.)
 | `test_example_codeaudit.py` | 18 | the shipped example driven through the CLI as a subprocess |
 | `test_hook.py` | 22 | hook verdicts, degradation, restore safety, drift modes |
 | `test_fingerprint.py` | 20 | key stability **across separate interpreters** |
-| `test_store.py` | 21 | atomicity, integrity, gc, concurrency, crash leftovers |
+| `test_store.py` | 32 | atomicity, integrity, gc, concurrency, crash leftovers |
 | `test_receipt.py` | 20 | schema, tamper detection, history |
 | `test_bundle.py` | 37 | export / verify / import, tampered and hostile bundles |
 | `test_config.py` | 17 | precedence `pyproject` < `doit-port.toml` < `DOIT_CONFIG` |

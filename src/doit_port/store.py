@@ -18,11 +18,13 @@ build.
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import json
 import os
 import re
 import shutil
+import threading
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
@@ -68,6 +70,8 @@ class ObjectStore:
         self.tmp_dir = self.root / "tmp"
         self.receipts_dir = self.root / "receipts"
         self.index_dir = self.root / "index"
+        self._locks: dict[str, threading.Lock] = {}
+        self._locks_guard = threading.Lock()
 
     # ------------------------------------------------------------------ setup
 
@@ -174,23 +178,46 @@ class ObjectStore:
         """Move the staged blob into place.
 
         Two writers of identical content race benignly: whoever gets there
-        first wins and the loser adopts the existing file. Windows raises
-        ``PermissionError`` when ``os.replace`` targets a file another thread
-        is replacing at the same instant, so a lost race is retried once --
-        and if the blob is there afterwards, we are done either way.
+        first wins and the loser adopts the existing file. Because the name *is*
+        the content hash, a loser knows the existing file holds the same bytes,
+        so nothing needs re-reading.
+
+        A per-target lock is used rather than "retry on OSError": on Windows a
+        lost ``os.replace`` race surfaces as ``PermissionError``, but a loser can
+        also observe a transient ``FileNotFoundError`` if the winner is mid-move.
+        Catching an arbitrary ``OSError`` would mask real disk faults; serialising
+        writers on the same key removes the race instead of papering over it.
         """
         target = self.blob_path(sha)
         target.parent.mkdir(parents=True, exist_ok=True)
-        if target.exists():
-            # Same content, same name: keep the existing file, drop the copy.
+        if target.is_file():
             return StoredObject(sha256=sha, size=size)
-        try:
-            os.replace(tmp, target)
-        except OSError:
+        with self._lock_for(target):
             if target.is_file():
                 return StoredObject(sha256=sha, size=size)
-            raise
+            os.replace(tmp, target)
         return StoredObject(sha256=sha, size=size)
+
+    @contextlib.contextmanager
+    def _lock_for(self, target: Path) -> Iterator[None]:
+        """Serialise writers for one blob within this process.
+
+        Cross-process safety does not rely on this: ``os.replace`` is atomic on
+        every supported platform, and identical content means identical bytes.
+        The lock exists so that concurrent threads in one process (a ``doit -n``
+        run, or a test) do not produce spurious errors on Windows.
+        """
+        key = str(target)
+        with self._locks_guard:
+            lock = self._locks.setdefault(key, threading.Lock())
+        with lock:
+            yield
+        # Opportunistically drop locks nobody else is waiting for; a dict of a
+        # few thousand entries is not a leak, but it is unbounded over a long
+        # session, and pruning here is cheap.
+        with self._locks_guard:
+            if not lock.locked() and self._locks.get(key) is lock:
+                del self._locks[key]
 
     # -------------------------------------------------------------------- read
 
