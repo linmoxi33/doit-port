@@ -34,6 +34,11 @@ jobs:
 
       # The suite spawns `python -m doit` as a subprocess, so the CLI has to be
       # importable from a clean interpreter, not only from pytest's sys.path.
+      # Compiles every .py in the tree, including ones pytest never imports
+      # (tools/, example helpers). SyntaxWarning -> error, same as pytest.
+      - name: Compile check
+        run: python -W error::SyntaxWarning -m compileall -q src tests tools examples
+
       - name: Run test suite
         run: python -m pytest tests/ -q
 

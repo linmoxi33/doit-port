@@ -292,7 +292,7 @@ def test_safe_join_rejects_non_relative_paths_before_resolving(
             return 1
 
     monkeypatch.setattr(Path, "resolve", lambda self, *a, **k: _Harmless())
-    for bad in ("/etc/passwd", "\windows\system32", "C:/Windows/notepad.exe", "C:relative"):
+    for bad in (r"/etc/passwd", r"\windows\system32", "C:/Windows/notepad.exe", "C:relative"):
         with pytest.raises(bundle_module.BundleError, match="unsafe path"):
             _safe_join(tmp_path, bad)
     monkeypatch.undo()

@@ -56,4 +56,7 @@ addopts = "-q"
 filterwarnings = [
     "error::DeprecationWarning:doit_port.*",
     "error::pytest.PytestUnhandledThreadExceptionWarning",
+    # An invalid escape sequence is a SyntaxWarning since 3.12 and silently
+    # becomes an error in a future release; catch it while it is cheap.
+    "error::SyntaxWarning",
 ]

@@ -127,10 +127,10 @@ def test_defaults_constant_matches_the_dataclass(tmp_path: Path) -> None:
 
 
 def test_relpath_normalises_backslashes_on_every_platform(tmp_path: Path) -> None:
-    """A Windows-style path must produce the same key on Linux.
+    r"""A Windows-style path must produce the same key on Linux.
 
     On POSIX a backslash is a legal filename character, so
-    ``Path("build\out.txt").as_posix()`` keeps it. That gave the same project
+    ``Path(r"build\out.txt").as_posix()`` keeps it. That gave the same project
     two different receipt keys -- ``build\out.txt`` on Linux, ``build/out.txt``
     on Windows -- so a cache built on one platform never hit on the other. Found
     by CI, not by the Windows-only local run.
