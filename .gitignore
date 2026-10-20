@@ -1,0 +1,21 @@
+# generated state
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.egg-info/
+build/
+dist/
+.venv/
+.doit-port/
+.doit.db
+
+# example artefacts
+examples/*/audit/
+examples/*/build/
+!examples/*/build/.gitkeep
+
+# editors / os
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

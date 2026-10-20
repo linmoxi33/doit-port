@@ -1,0 +1,11 @@
+# Input for the example pipeline: which files to audit, and the finding budget.
+# Editing this file must invalidate lint + summary + gate (it is declared as an
+# input of all three tasks in dodo.py).
+
+[audit]
+modules = [
+    "src/sample_pkg/__init__.py",
+    "src/sample_pkg/calc.py",
+    "src/sample_pkg/legacy.py",
+]
+threshold = 8

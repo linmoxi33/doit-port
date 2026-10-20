@@ -1,0 +1,7 @@
+# Store lives inside the example so a reader can inspect it, and a broken
+# artefact triggers a rebuild rather than a silent overwrite.
+[doit_port]
+store = ".doit-port"
+on_drift = "rebuild"
+flavor = "codeaudit-example-v1"
+max_blob_mb = 32
